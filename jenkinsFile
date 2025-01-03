@@ -2,6 +2,8 @@ pipeline {
     agent any
     parameters {
         string(name: 'NUM_INSTANCES', defaultValue: '2', description: 'Cantidad de instancias EC2 a crear')
+        booleanParam(name: 'DELETE_INSTANCES', defaultValue: false, description: 'Eliminar instancias EC2 existentes con el nombre JMeterLG-Jenkins sin crear nuevas')
+
     }
     stages {
         stage('Setup AWS') {
@@ -14,8 +16,38 @@ pipeline {
         }
 
 
+        stage('Delete Existing EC2 Instances') {
+            when {
+                expression { params.DELETE_INSTANCES }
+            }
+            steps {
+                withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                    script {
+                        def existingInstanceIds = sh(script: """
+                            aws ec2 describe-instances \\
+                                --filters "Name=tag:Name,Values=JMeterLG-Jenkins" "Name=instance-state-name,Values=running" \\
+                                --query 'Reservations[].Instances[].InstanceId' \\
+                                --output text
+                        """, returnStdout: true).trim()
+
+                        if (existingInstanceIds) {
+                            echo "Eliminando instancias existentes: ${existingInstanceIds}"
+                            sh "aws ec2 terminate-instances --instance-ids ${existingInstanceIds}"
+                            echo "Instancias eliminadas: ${existingInstanceIds}"
+                        } else {
+                            echo "No se encontraron instancias existentes con el nombre JMeterLG-Jenkins."
+                        }
+                    }
+                }
+            }
+        }
+
+
 
         stage('Create EC2 Instances') {
+            when {
+                expression { !params.DELETE_INSTANCES }
+            }
             steps {
                 withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
                     script {
