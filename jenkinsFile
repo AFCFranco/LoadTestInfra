@@ -1,7 +1,7 @@
 pipeline {
     agent any
     parameters {
-        string(name: 'NUM_INSTANCES', defaultValue: '2', description: 'Cantidad de instancias EC2 a crear')
+        string(name: 'NUM_INSTANCES', defaultValue: '3', description: 'Cantidad de instancias EC2 a crear')
         booleanParam(name: 'DELETE_INSTANCES', defaultValue: false, description: 'Eliminar instancias EC2 existentes con el nombre JMeterLG-Jenkins sin crear nuevas')
 
     }
