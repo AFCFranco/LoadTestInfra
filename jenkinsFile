@@ -1,3 +1,67 @@
-{
-	"folders": []
+pipeline {
+    agent any
+    parameters {
+        string(name: 'NUM_INSTANCES', defaultValue: '2', description: 'Cantidad de instancias EC2 a crear')
+    }
+    stages {
+        stage('Setup AWS') {
+            steps {
+                // 'aws-jenkins-credentials' is the Credentials ID in Jenkins
+                withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                    sh 'aws sts get-caller-identity' // Verify credentials
+                }
+            }
+        }
+
+
+
+        stage('Create EC2 Instances') {
+            steps {
+                withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                    script {
+                        // Importante: Ajusta la ruta al script user_data.sh según corresponda.
+                        env.INSTANCE_IDS = sh(script: """
+                            aws ec2 run-instances \\
+                                --image-id ami-01816d07b1128cd2d \\
+                                --count ${params.NUM_INSTANCES} \\
+                                --instance-type t2.medium \\
+                                --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=jenkins-created}]' \\
+                                --user-data file:///home/acastao/user_data.sh \\
+                                --query 'Reservations[].Instances[].InstanceId' \\
+                                --output text
+                        """, returnStdout: true).trim()
+
+                        echo "Instancias creadas: ${env.INSTANCE_IDS}"
+                    }
+                }
+            }
+        }
+
+
+        stage('Get EC2 Instances Info') {
+            steps {
+                withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                sh """
+                aws ec2 describe-instances \
+                --filters "Name=tag:Name,Values=jenkins-created" "Name=instance-state-name,Values=pending,running" \
+                --query 'Reservations[].Instances[].PublicIpAddress'
+            """
+                }
+            }   
+        }
+    }
+    post {
+        failure {
+            script {
+                if (env.INSTANCE_IDS) {
+                    withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                        sh "aws ec2 terminate-instances --instance-ids ${env.INSTANCE_IDS}"
+                        echo "Instancias terminadas: ${env.INSTANCE_IDS}"
+                    }
+                } else {
+                    echo "No hay instancias para terminar (INSTANCE_IDS vacío)."
+                }
+            }
+        }
+    }
 }
