@@ -57,7 +57,7 @@ pipeline {
                                 --image-id ami-01816d07b1128cd2d \\
                                 --count ${params.NUM_INSTANCES} \\
                                 --instance-type t2.medium \\
-                                --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=jenkins-created}]' \\
+                                --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=JMeterLG-Jenkins}]' \\
                                 --user-data file:///home/acastao/user_data.sh \\
                                 --query 'Reservations[].Instances[].InstanceId' \\
                                 --output text
@@ -75,7 +75,7 @@ pipeline {
                 withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
                 sh """
                 aws ec2 describe-instances \
-                --filters "Name=tag:Name,Values=jenkins-created" "Name=instance-state-name,Values=pending,running" \
+                --filters "Name=tag:Name,Values=JMeterLG-Jenkins" "Name=instance-state-name,Values=pending,running" \
                 --query 'Reservations[].Instances[].PublicIpAddress'
             """
                 }
