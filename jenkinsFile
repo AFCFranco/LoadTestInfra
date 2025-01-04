@@ -71,6 +71,9 @@ pipeline {
 
 
         stage('Get EC2 Instances Info') {
+            when {
+                expression { !params.DELETE_INSTANCES }
+            }
             steps {
                 withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
                 sh """
