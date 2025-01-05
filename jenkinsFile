@@ -93,7 +93,7 @@ pipeline {
                                     --count 1 \\
                                     --instance-type t2.medium \\
                                     --subnet-id ${env.SUBNET_ID} \\
-                                    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=JMeter-Master}]' \\     
+                                    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=JMeter-Master}]" \\   
                                     --query 'Reservations[].Instances[].InstanceId' \\
                                     --output text
                             """, returnStdout: true).trim()
