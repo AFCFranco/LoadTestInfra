@@ -72,7 +72,7 @@ pipeline {
                                     --count ${params.NUM_INSTANCES} \\
                                     --instance-type t2.medium \\
                                     --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=JMeterLG-Jenkins}]' \\
-                                    --user-data file://${env.WORKSPACE}/user_data_salve.sh \\
+                                    --user-data file://${env.WORKSPACE}/user_data_slave.sh \\
                                     --query 'Instances[0].SubnetId' \\
                                     --output text
                             """, returnStdout: true).trim()
