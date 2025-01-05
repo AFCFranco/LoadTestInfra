@@ -1,7 +1,7 @@
 pipeline {
     agent any
     parameters {
-        string(name: 'NUM_INSTANCES', defaultValue: '3', description: 'Cantidad de instancias EC2 a crear')
+        string(name: 'NUM_INSTANCES', defaultValue: '1', description: 'Cantidad de instancias EC2 a crear')
         booleanParam(name: 'DELETE_INSTANCES', defaultValue: false, description: 'Eliminar instancias EC2 existentes con el nombre JMeterLG-Jenkins sin crear nuevas')
         booleanParam(name: 'CREATE_MASTER', defaultValue: false, description: 'Crear JMeter master en la misma subnet')
     }
@@ -73,7 +73,7 @@ pipeline {
                                     --instance-type t2.medium \\
                                     --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=JMeterLG-Jenkins}]' \\
                                     --user-data file:///home/acastao/user_data.sh \\
-                                    --query 'Reservations[].Instances[0].SubnetId' \\
+                                    --query 'Instances[0].SubnetId' \\
                                     --output text
                             """, returnStdout: true).trim()
 
@@ -128,6 +128,7 @@ pipeline {
                 if (env.INSTANCE_IDS) {
                     withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
                         sh "aws ec2 terminate-instances --instance-ids ${env.INSTANCE_IDS}"
+                        
                         echo "Instancias terminadas: ${env.INSTANCE_IDS}"
                     }
                 } else {
