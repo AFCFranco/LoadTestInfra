@@ -46,9 +46,9 @@ pipeline {
                         }
 
                         if (existingInstanceIdMaster) {
-                            echo "Eliminando instancias existentes: ${existingInstanceIds}"
-                            sh "aws ec2 terminate-instances --instance-ids ${existingInstanceIds}"
-                            echo "Instancias eliminadas: ${existingInstanceIds}"
+                            echo "Eliminando instancias existentes: ${existingInstanceIdMaster}"
+                            sh "aws ec2 terminate-instances --instance-ids ${existingInstanceIdMaster}"
+                            echo "Instancias eliminadas: ${existingInstanceIdMaster}"
                         } else {
                             echo "No se encontraron instancias existentes con el nombre JMeter-Master."
                         }
