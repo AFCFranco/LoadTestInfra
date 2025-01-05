@@ -3,7 +3,7 @@ pipeline {
     parameters {
         string(name: 'NUM_INSTANCES', defaultValue: '3', description: 'Cantidad de instancias EC2 a crear')
         booleanParam(name: 'DELETE_INSTANCES', defaultValue: false, description: 'Eliminar instancias EC2 existentes con el nombre JMeterLG-Jenkins sin crear nuevas')
-
+        booleanParam(name: 'CREATE_MASTER', defaultValue: false, description: 'Crear JMeter master en la misma subnet')
     }
     stages {
         stage('Setup AWS') {
@@ -30,6 +30,13 @@ pipeline {
                                 --output text
                         """, returnStdout: true).trim()
 
+                        def existingInstanceIdMaster = sh(script: """
+                            aws ec2 describe-instances \\
+                                --filters "Name=tag:Name,Values=JMeter-Master" "Name=instance-state-name,Values=running" \\
+                                --query 'Reservations[].Instances[].InstanceId' \\
+                                --output text
+                        """, returnStdout: true).trim()
+
                         if (existingInstanceIds) {
                             echo "Eliminando instancias existentes: ${existingInstanceIds}"
                             sh "aws ec2 terminate-instances --instance-ids ${existingInstanceIds}"
@@ -37,12 +44,19 @@ pipeline {
                         } else {
                             echo "No se encontraron instancias existentes con el nombre JMeterLG-Jenkins."
                         }
+
+                        if (existingInstanceIdMaster) {
+                            echo "Eliminando instancias existentes: ${existingInstanceIds}"
+                            sh "aws ec2 terminate-instances --instance-ids ${existingInstanceIds}"
+                            echo "Instancias eliminadas: ${existingInstanceIds}"
+                        } else {
+                            echo "No se encontraron instancias existentes con el nombre JMeter-Master."
+                        }
+
                     }
                 }
             }
         }
-
-
 
         stage('Create EC2 Instances') {
             when {
@@ -52,18 +66,41 @@ pipeline {
                 withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
                     script {
                         // Importante: Ajusta la ruta al script user_data.sh según corresponda.
-                        env.INSTANCE_IDS = sh(script: """
+                        env.SUBNET_ID = sh(script: """
                             aws ec2 run-instances \\
-                                --image-id ami-01816d07b1128cd2d \\
-                                --count ${params.NUM_INSTANCES} \\
-                                --instance-type t2.medium \\
-                                --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=JMeterLG-Jenkins}]' \\
-                                --user-data file:///home/acastao/user_data.sh \\
-                                --query 'Reservations[].Instances[].InstanceId' \\
-                                --output text
-                        """, returnStdout: true).trim()
+                                    --image-id ami-01816d07b1128cd2d \\
+                                    --count ${params.NUM_INSTANCES} \\
+                                    --instance-type t2.medium \\
+                                    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=JMeterLG-Jenkins}]' \\
+                                    --user-data file:///home/acastao/user_data.sh \\
+                                    --query 'Reservations[].Instances[0].SubnetId' \\
+                                    --output text
+                            """, returnStdout: true).trim()
 
-                        echo "Instancias creadas: ${env.INSTANCE_IDS}"
+                        env.INSTANCE_IDS = sh(script: """
+                            aws ec2 describe-instances \\
+                                    --filters "Name=subnet-id,Values=${env.SUBNET_ID}" "Name=tag:Name,Values=JMeterLG-Jenkins" \\
+                                    --query 'Reservations[].Instances[].InstanceId' \\
+                                    --output text
+                            """, returnStdout: true).trim()
+
+                            echo "Instancias creadas: ${env.INSTANCE_IDS}"
+                            echo "Subnet utilizada: ${env.SUBNET_ID}"
+                         if (params.CREATE_MASTER) {
+                            def masterInstanceId = sh(script: """
+                                aws ec2 run-instances \\
+                                    --image-id ami-01816d07b1128cd2d \\
+                                    --count 1 \\
+                                    --instance-type t2.medium \\
+                                    --subnet-id ${env.SUBNET_ID} \\
+                                    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=JMeter-Master}]' \\
+                                    --user-data file:///home/acastao/user_data_master.sh \\
+                                    --query 'Reservations[].Instances[].InstanceId' \\
+                                    --output text
+                            """, returnStdout: true).trim()
+
+                            echo "JMeter Master creado con ID: ${masterInstanceId}"
+                        }
                     }
                 }
             }
@@ -76,11 +113,11 @@ pipeline {
             }
             steps {
                 withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
-                sh """
-                aws ec2 describe-instances \
-                --filters "Name=tag:Name,Values=JMeterLG-Jenkins" "Name=instance-state-name,Values=pending,running" \
-                --query 'Reservations[].Instances[].PublicIpAddress'
-            """
+                    sh """
+                    aws ec2 describe-instances \
+                    --filters "Name=tag:Name,Values=JMeterLG-Jenkins" "Name=instance-state-name,Values=pending,running" \
+                    --query 'Reservations[].Instances[].PublicIpAddress'
+                    """
                 }
             }   
         }
