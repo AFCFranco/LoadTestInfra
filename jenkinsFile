@@ -98,8 +98,16 @@ pipeline {
                                     --output text
                             """, returnStdout: true).trim()
 
+                            env.INSTANCE_ID_MASTER = sh(script: """
+                            aws ec2 describe-instances \\
+                                    --filters "Name=subnet-id,Values=${env.SUBNET_ID}" "Name=tag:Name,Values=JMeter-Master" \\
+                                    --query 'Reservations[].Instances[].InstanceId' \\
+                                    --output text
+                            """, returnStdout: true).trim()
+                            echo "Instancias creadas: ${env.INSTANCE_ID_MASTER}"
                             echo "JMeter Master creado con ID: ${masterInstanceId}"
-                        }
+                            }
+                        
                     }
                 }
             }
@@ -132,6 +140,16 @@ pipeline {
                     }
                 } else {
                     echo "No hay instancias para terminar (INSTANCE_IDS vacío)."
+                }
+
+                if (env.INSTANCE_ID_MASTER) {
+                    withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                        sh "aws ec2 terminate-instances --instance-ids ${env.INSTANCE_ID_MASTER}"
+
+                        echo "Instancias terminadas: ${env.INSTANCE_ID_MASTER}"
+                    }
+                } else {
+                    echo "No hay instancias para terminar (INSTANCE_ID_MASTER vacío)."
                 }
             }
         }
