@@ -93,8 +93,7 @@ pipeline {
                                     --count 1 \\
                                     --instance-type t2.medium \\
                                     --subnet-id ${env.SUBNET_ID} \\
-                                    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=JMeter-Master}]' \\
-                                    
+                                    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=JMeter-Master}]' \\     
                                     --query 'Reservations[].Instances[].InstanceId' \\
                                     --output text
                             """, returnStdout: true).trim()
@@ -128,7 +127,7 @@ pipeline {
                 if (env.INSTANCE_IDS) {
                     withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
                         sh "aws ec2 terminate-instances --instance-ids ${env.INSTANCE_IDS}"
-                        
+
                         echo "Instancias terminadas: ${env.INSTANCE_IDS}"
                     }
                 } else {
