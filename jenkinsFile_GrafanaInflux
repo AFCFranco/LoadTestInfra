@@ -1,106 +1,107 @@
 pipeline {
     agent any
    parameters {
-//        string(name: 'NUM_INSTANCES', defaultValue: '1', description: 'Cantidad de instancias EC2 a crear')
-        booleanParam(name: 'DELETE_INSTANCES', defaultValue: false, description: 'Eliminar instancias EC2 existentes con el nombre JMeterLG-Jenkins sin crear nuevas')
-//        booleanParam(name: 'CREATE_MASTER', defaultValue: false, description: 'Crear JMeter master en la misma subnet')
-    }
-    stages {
-        stage('Setup AWS') {
-            steps {
-                // 'aws-jenkins-credentials' is the Credentials ID in Jenkins
-                withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
-                    sh 'aws sts get-caller-identity' // Verify credentials
-                }
-            }
+    //        string(name: 'NUM_INSTANCES', defaultValue: '1', description: 'Cantidad de instancias EC2 a crear')
+            booleanParam(name: 'DELETE_INSTANCES', defaultValue: false, description: 'Eliminar instancias EC2 existentes con el nombre JMeterLG-Jenkins sin crear nuevas')
+    //        booleanParam(name: 'CREATE_MASTER', defaultValue: false, description: 'Crear JMeter master en la misma subnet')
         }
-
-
-        stage('Delete Existing EC2 Instances') {
-            when {
-                expression { params.DELETE_INSTANCES }
-            }
-            steps {
-                withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
-                    script {
-                        def existingInstanceIds = sh(script: """
-                            aws ec2 describe-instances \\
-                                --filters "Name=tag:Name,Values=GrafanaInflux" "Name=instance-state-name,Values=running" \\
-                                --query 'Reservations[].Instances[].InstanceId' \\
-                                --output text
-                        """, returnStdout: true).trim()
-
-             
-
-                        if (existingInstanceIds) {
-                            echo "Eliminando instancias existentes: ${existingInstanceIds}"
-                            sh "aws ec2 terminate-instances --instance-ids ${existingInstanceIds}"
-                            echo "Instancias eliminadas: ${existingInstanceIds}"
-                        } else {
-                            echo "No se encontraron instancias existentes con el nombre GrafanaInflux."
-                        }   
+        stages {
+            stage('Setup AWS') {
+                steps {
+                    // 'aws-jenkins-credentials' is the Credentials ID in Jenkins
+                    withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                        sh 'aws sts get-caller-identity' // Verify credentials
                     }
                 }
             }
-        }
 
-        stage('Create EC2 Instances') {
-            when {
-                expression { !params.DELETE_INSTANCES }
-            }
-            steps {
-                withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
-                    script {
-                        // Importante: Ajusta la ruta al script user_data.sh según corresponda.
-                        env.SUBNET_ID = sh(script: """
-                            aws ec2 run-instances \\
-                                    --image-id ami-01816d07b1128cd2d \\
-                                    --count 1\\
-                                    --instance-type t2.medium \\
-                                    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=GrafanaInflux}]' \\
-                                    --user-data file://${env.WORKSPACE}/user_data_GrafanaInflux.sh \\
-                                    --query 'Instances[0].SubnetId' \\
-                                    --output text
-                            """, returnStdout: true).trim()
 
-                        env.INSTANCE_IDS = sh(script: """
-                            aws ec2 describe-instances \\
-                                    --filters "Name=subnet-id,Values=${env.SUBNET_ID}" "Name=tag:Name,Values=GrafanaInflux" \\
+            stage('Delete Existing EC2 Instances') {
+                when {
+                    expression { params.DELETE_INSTANCES }
+                }
+                steps {
+                    withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                        script {
+                            def existingInstanceIds = sh(script: """
+                                aws ec2 describe-instances \\
+                                    --filters "Name=tag:Name,Values=GrafanaInflux" "Name=instance-state-name,Values=running" \\
                                     --query 'Reservations[].Instances[].InstanceId' \\
                                     --output text
                             """, returnStdout: true).trim()
 
-                            echo "Instancias creadas: ${env.INSTANCE_IDS}"
-                            echo "Subnet utilizada: ${env.SUBNET_ID}"
-                }
-            }
-        }
-        stage('Get EC2 Instances Info') {
-            when {
-                expression { !params.DELETE_INSTANCES }
-            }
-            steps {
-                withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
-                    sh """
-                    aws ec2 describe-instances \
-                    --filters "Name=tag:Name,Values=GrafanaInflux" "Name=instance-state-name,Values=pending,running" \
-                    --query 'Reservations[].Instances[].PublicIpAddress'
-                    """
-                }
-            }   
-        }
-    }
-    post {
-        failure {
-            script {
-                if (env.INSTANCE_IDS) {
-                    withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
-                        sh "aws ec2 terminate-instances --instance-ids ${env.INSTANCE_IDS}"
+                
 
-                        echo "Instancias terminadas: ${env.INSTANCE_IDS}"
+                            if (existingInstanceIds) {
+                                echo "Eliminando instancias existentes: ${existingInstanceIds}"
+                                sh "aws ec2 terminate-instances --instance-ids ${existingInstanceIds}"
+                                echo "Instancias eliminadas: ${existingInstanceIds}"
+                            } else {
+                                echo "No se encontraron instancias existentes con el nombre GrafanaInflux."
+                            }   
+                        }
                     }
-                } else {
-                    echo "No hay instancias para terminar (INSTANCE_IDS vacío)."
+                }
+            }
+
+            stage('Create EC2 Instances') {
+                when {
+                    expression { !params.DELETE_INSTANCES }
+                }
+                steps {
+                    withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                        script {
+                            // Importante: Ajusta la ruta al script user_data.sh según corresponda.
+                            env.SUBNET_ID = sh(script: """
+                                aws ec2 run-instances \\
+                                        --image-id ami-01816d07b1128cd2d \\
+                                        --count 1\\
+                                        --instance-type t2.medium \\
+                                        --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=GrafanaInflux}]' \\
+                                        --user-data file://${env.WORKSPACE}/user_data_GrafanaInflux.sh \\
+                                        --query 'Instances[0].SubnetId' \\
+                                        --output text
+                                """, returnStdout: true).trim()
+
+                            env.INSTANCE_IDS = sh(script: """
+                                aws ec2 describe-instances \\
+                                        --filters "Name=subnet-id,Values=${env.SUBNET_ID}" "Name=tag:Name,Values=GrafanaInflux" \\
+                                        --query 'Reservations[].Instances[].InstanceId' \\
+                                        --output text
+                                """, returnStdout: true).trim()
+
+                                echo "Instancias creadas: ${env.INSTANCE_IDS}"
+                                echo "Subnet utilizada: ${env.SUBNET_ID}"
+                    }
+                }
+            }
+            stage('Get EC2 Instances Info') {
+                when {
+                    expression { !params.DELETE_INSTANCES }
+                }
+                steps {
+                    withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                        sh """
+                        aws ec2 describe-instances \
+                        --filters "Name=tag:Name,Values=GrafanaInflux" "Name=instance-state-name,Values=pending,running" \
+                        --query 'Reservations[].Instances[].PublicIpAddress'
+                        """
+                    }
+                }   
+            }
+        }
+        post {
+            failure {
+                script {
+                    if (env.INSTANCE_IDS) {
+                        withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
+                            sh "aws ec2 terminate-instances --instance-ids ${env.INSTANCE_IDS}"
+
+                            echo "Instancias terminadas: ${env.INSTANCE_IDS}"
+                        }
+                    } else {
+                        echo "No hay instancias para terminar (INSTANCE_IDS vacío)."
+                    }
                 }
             }
         }
