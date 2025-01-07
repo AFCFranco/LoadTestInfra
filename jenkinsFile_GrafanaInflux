@@ -1,10 +1,10 @@
 pipeline {
     agent any
-//    parameters {
+   parameters {
 //        string(name: 'NUM_INSTANCES', defaultValue: '1', description: 'Cantidad de instancias EC2 a crear')
         booleanParam(name: 'DELETE_INSTANCES', defaultValue: false, description: 'Eliminar instancias EC2 existentes con el nombre JMeterLG-Jenkins sin crear nuevas')
 //        booleanParam(name: 'CREATE_MASTER', defaultValue: false, description: 'Crear JMeter master en la misma subnet')
-//    }
+    }
     stages {
         stage('Setup AWS') {
             steps {
@@ -55,7 +55,7 @@ pipeline {
                         env.SUBNET_ID = sh(script: """
                             aws ec2 run-instances \\
                                     --image-id ami-01816d07b1128cd2d \\
-                                    --count ${params.NUM_INSTANCES} \\
+                                    --count 1\\
                                     --instance-type t2.medium \\
                                     --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=GrafanaInflux}]' \\
                                     --user-data file://${env.WORKSPACE}/user_data_GrafanaInflux.sh \\
@@ -75,8 +75,6 @@ pipeline {
                 }
             }
         }
-
-
         stage('Get EC2 Instances Info') {
             when {
                 expression { !params.DELETE_INSTANCES }
@@ -85,7 +83,7 @@ pipeline {
                 withAWS(credentials: 'aws-jenkins-credentials', region: 'us-east-1') {
                     sh """
                     aws ec2 describe-instances \
-                    --filters "Name=tag:Name,Values=JMeterLG-Jenkins" "Name=instance-state-name,Values=pending,running" \
+                    --filters "Name=tag:Name,Values=GrafanaInflux" "Name=instance-state-name,Values=pending,running" \
                     --query 'Reservations[].Instances[].PublicIpAddress'
                     """
                 }
