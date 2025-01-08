@@ -17,7 +17,7 @@ wget https://download.influxdata.com/influxdb/releases/influxdb-1.11.8-linux-amd
 
 echo "Descomprimiendo InfluxDB..."
 cd /tmp
-tar -xvzf influxdb-1.11.8-linux-amd64.tar.gz
+tar -xvf influxdb-1.11.8-linux-amd64.tar.gz
 cd influxdb-1.11.8-linux-amd64
 
 echo "Instalando binarios de InfluxDB en /usr/local/bin/..."
